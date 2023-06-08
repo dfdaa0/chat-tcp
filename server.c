@@ -6,6 +6,8 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#define MAX_CLIENTS 15
+
 void *handleClient(void *socket);
 
 int main(int argc, char *argv[]) {
@@ -79,8 +81,17 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-void *handleClient(void *socket) {
-    int clientSocket = *(int *)socket;
+typedef struct {
+    int id;
+    int socket;
+} ClientInfo;
+
+int numClients = 0;
+ClientInfo clients[MAX_CLIENTS];
+
+
+void *handleClient(void *arg) {
+    int clientSocket = *(int *)arg;
     char buffer[1024] = {0};
     int bytesRead;
 
@@ -88,7 +99,56 @@ void *handleClient(void *socket) {
     while ((bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0) {
         printf("Received message from client: %s\n", buffer);
 
-        // Do any necessary processing on the message
+        if (strcmp(buffer, "REQ_ADD") == 0) {
+            if (numClients >= MAX_CLIENTS) {
+                // Maximum number of clients reached
+                printf("Sending ERROR(1) to the client\n");
+                const char *message = "ERROR(1)";
+                send(clientSocket, message, strlen(message), 0);
+            } else {
+                // Assign an ID to the client
+                int clientId = numClients++;
+                clients[clientId].id = clientId;
+                clients[clientId].socket = clientSocket;
+
+                // Send the assigned ID to the client
+                char idMessage[50];
+                sprintf(idMessage, "You are the number %d\n", clientId);
+                printf("Client %d added\n", clientId);
+                send(clientSocket, idMessage, strlen(idMessage), 0);
+            }
+        } else if (strncmp(buffer, "REQ_REM", 7) == 0) {
+            // Process REQ_REM message
+            int idSender;
+            sscanf(buffer, "REQ_REM(%d)", &idSender);
+
+            // Remove the client with idSender from the network
+            // ...
+
+
+        } else if (strncmp(buffer, "RES_LIST", 8) == 0) {
+            // Process RES_LIST message
+            // ...
+
+
+        } else if (strncmp(buffer, "MSG", 3) == 0) {
+            // Process MSG message
+            int idSender, idReceiver;
+            char message[1024];
+            sscanf(buffer, "MSG(%d,%d,%[^\n])", &idSender, &idReceiver, message);
+
+            // Check if the receiver exists in the network
+            // ...
+
+            // Forward the message to the receiver's client
+            // ...
+
+            // Print error message if receiver not found
+            // ...
+        } else {
+            // Unknown message
+            // ...
+        }
 
         memset(buffer, 0, sizeof(buffer));
     }
@@ -97,6 +157,18 @@ void *handleClient(void *socket) {
         printf("Client disconnected\n");
     } else if (bytesRead == -1) {
         perror("Receive error");
+    }
+
+    // Remove the client from the list
+    for (int i = 0; i < numClients; i++) {
+        if (clients[i].socket == clientSocket) {
+            // Shift the remaining clients to fill the gap
+            for (int j = i; j < numClients - 1; j++) {
+                clients[j] = clients[j + 1];
+            }
+            numClients--;
+            break;
+        }
     }
 
     // Close the client socket
