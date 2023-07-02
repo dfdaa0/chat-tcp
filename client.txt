@@ -1,7 +1,7 @@
 Após iniciarem a conexão, os usuários automaticamente enviam "REQ_ADD" para o servidor. Devem, então, aguardar por uma mensagem do servidor. Se forem aceitos, receberão apenas um número inteiro, e esse valor deve ser armazenado numa variável chamada IdOrigin. Dessa forma, são tratados como clientes, e podem receber comandos via terminal.
 Se receberem um ERROR(1), significa que não foram aceitos, devem fechar o socket com close() e fechar o programa.
 
-Mensagens que podem ser recebidas do servidor:
+Mensagens que o cliente pode receber do servidor:
 - "RES_LIST([IdUseri], [IdUserj], …)". Quando essa mensagem for recebida, o cliente deve armazenar os valores dentro dos parênteses numa lista de usuarios disponíveis. Eles estão separados por ",". Ou seja, se o usuário recebe "RES_LIST(1, 2, 3)", ele deve armazenar os valores 1, 2 e 3 numa lista, sempre verificando se esse valor já existe.
 - "MSG([IdSender], [IdReceiver], [Message])". Quando essa mensagem for recebida, deve ser impresso no terminal "[IdSender]: [Message]".
 - "REQ_REM([IdUser])". Quando essa mensagem for recebida, [IdUser] deve ser retirado da lista de usuáros disponíveis.
