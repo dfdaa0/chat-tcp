@@ -1,0 +1,7 @@
+Os clientes enviam mensagens para o servidor, e o servidor serve como intermediário da rede.
+Mensagens que o servidor pode receber, e suas respostas:
+- "REQ_ADD": o servidor verifica se o limite de clientes já foi batido. Se sim, envia "ERROR(NULL, 1)" para o usuário que enviou REQ_ADD. Se não, esse novo usuário recebe um ID, e é cadastrado no array clients[], e o servidor envia "MSG([NewUserId], NULL, "User [NewUserId] joned the group")" para todos os clientes da rede, onde [NewUserId] é o ID do novo usuário;
+- "REQ_REM([IdSender])": o servidor deve checar se o usuário de ID [IdSender] está registrado rede (array clients[]). Se sim, envia a mensagem "REQ_REM([IdSender])" para todos os outros clientes da rede, com exceção do [IdSender]. Se não, envia "ERROR([IdSender], 2)" para o [IdSender];
+- "RES_LIST([IdSender])": o servidor envia, para o [IdSender], a mensagem "RES_LIST([IdUseri], [IdUserj], …)", onde dentro do parênteses há todos os IDs conectados naquele momento, separados por ",";
+- "MSG([IdSender], [IdReceiver], [Message])": se o cliente existir, o servidor envia essa mensagem para o cliente cujo ID é [IdReceiver], e envia um "OK([IdSender], 1)" para o [IdSender]. Se o cliente com o Id [IdReceiver] não existir, o servidor printa no próprio terminal "User [IdReceiver] not found", e envia para o cliente de ID [IdSender] a mensagem "ERROR([IdSender], 3)";
+- "MSG([IdSender], NULL, [Message])": o servidor envia essa mensagem para todos os clientes da rede.
