@@ -25,5 +25,5 @@ Comandos que podem ser digitados nos terminais do cliente:
 - "send all "[Message]"": envia "MSG([IdOrigin], NULL, [Message])" para o servidor. [Message] está entre aspas duplas;
 - "close connection": envia "REQ_REM([IdOrigin])" para o servidor;
 
-Para fins de debug, toda mensagem que o servidor receber é printada no terminal.
+Para fins de debug, toda mensagem que o cliente receber deve ser printada no terminal.
 
