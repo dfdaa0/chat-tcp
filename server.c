@@ -149,8 +149,8 @@ void *handleClient(void *arg) {
         if (strcmp(buffer, "REQ_ADD") == 0) {
             if (numClients >= MAX_CLIENTS) {
                 // Maximum number of clients reached
-                printf("Sending ERROR(1) to the client\n");
-                const char *message = "ERROR(1)";
+                printf("Sending ERROR(NULL, 1) to the client\n");
+                const char *message = "ERROR(NULL, 1)";
                 sendMessageToClient(clientSocket, message);
             } else {
                 // Find the first available ID
@@ -164,16 +164,21 @@ void *handleClient(void *arg) {
 
                 if (clientId == -1) {
                     // No available ID found (shouldn't happen if MAX_CLIENTS is correct)
-                    printf("For some reason, no avaliable ID was found\n");
+                    printf("For some reason, no available ID was found\n");
                 } else {
                     clients[clientId].id = clientId;
                     clients[clientId].socket = clientSocket;
 
                     // Send the assigned ID to the client
                     char idMessage[50];
-                    sprintf(idMessage, "You are the number %d\n", clientId);
+                    sprintf(idMessage, "%d\n", clientId);
                     printf("Client %d added\n", clientId);
                     sendMessageToClient(clientSocket, idMessage);
+
+                    // Notify all clients about the new user
+                    char newUserMessage[50];
+                    sprintf(newUserMessage, "MSG(%d, NULL, User %d joined the group!)", clientId, clientId);
+                    sendMessageToAllClients(newUserMessage);
                 }
             }
         } else if (strncmp(buffer, "REQ_REM", 7) == 0) {
@@ -181,49 +186,82 @@ void *handleClient(void *arg) {
             int idSender;
             sscanf(buffer, "REQ_REM(%d)", &idSender);
 
-            // Remove the client with idSender from the network
-            removeClient(clientSocket);
-
-        } else if (strncmp(buffer, "RES_LIST", 8) == 0) {
-            // Process RES_LIST message
-            // Build the list of connected client IDs
-            char listMessage[1024] = {0};
+            // Check if the sender exists in the network
+            int senderIndex = -1;
             pthread_mutex_lock(&clientsMutex);
             for (int i = 0; i < numClients; i++) {
-                char idString[10];
-                sprintf(idString, "%d ", clients[i].id);
-                strcat(listMessage, idString);
+                if (clients[i].id == idSender) {
+                    senderIndex = i;
+                    break;
+                }
             }
             pthread_mutex_unlock(&clientsMutex);
 
+            if (senderIndex != -1) {
+                // Notify all other clients about the user removal
+                char removalMessage[50];
+                sprintf(removalMessage, "REQ_REM(%d)", idSender);
+                sendMessageToOtherClients(senderIndex, removalMessage);
+            } else {
+                // Sender not found
+                char errorMessage[50];
+                sprintf(errorMessage, "ERROR(%d, 2)", idSender);
+                sendMessageToClient(clientSocket, errorMessage);
+            }
+        } else if (strncmp(buffer, "RES_LIST", 8) == 0) {
+            // Process RES_LIST message
+            // Build the list of connected client IDs
+            char listMessage[1024] = "RES_LIST(";
+            pthread_mutex_lock(&clientsMutex);
+            for (int i = 0; i < numClients; i++) {
+                char idString[10];
+                sprintf(idString, "%d,", clients[i].id);
+                strcat(listMessage, idString);
+            }
+            pthread_mutex_unlock(&clientsMutex);
+            // Replace the last comma with a closing parenthesis
+            listMessage[strlen(listMessage) - 1] = ')';
             // Send the list to the client
             sendMessageToClient(clientSocket, listMessage);
-
         } else if (strncmp(buffer, "MSG", 3) == 0) {
             // Process MSG message
             int idSender, idReceiver;
             char message[1024];
             sscanf(buffer, "MSG(%d,%d,%[^\n])", &idSender, &idReceiver, message);
 
-            // Check if the receiver exists in the network
-            int receiverSocket = -1;
-            pthread_mutex_lock(&clientsMutex);
-            for (int i = 0; i < numClients; i++) {
-                if (clients[i].id == idReceiver) {
-                    receiverSocket = clients[i].socket;
-                    break;
-                }
-            }
-            pthread_mutex_unlock(&clientsMutex);
-
-            if (receiverSocket != -1) {
-                // Forward the message to the receiver's client
-                char forwardMessage[1100];
-                sprintf(forwardMessage, "MSG(%d,%d,%s)", idSender, idReceiver, message);
-                send(receiverSocket, forwardMessage, strlen(forwardMessage), 0);
+            if (idReceiver == -1) {
+                // Broadcast message to all clients
+                char broadcastMessage[1100];
+                sprintf(broadcastMessage, "MSG(%d,NULL,%s)", idSender, message);
+                sendMessageToAllClients(broadcastMessage);
             } else {
-                // Print error message if receiver not found
-                printf("User %d not found\n", idReceiver);
+                // Check if the receiver exists in the network
+                int receiverSocket = -1;
+                pthread_mutex_lock(&clientsMutex);
+                for (int i = 0; i < numClients; i++) {
+                    if (clients[i].id == idReceiver) {
+                        receiverSocket = clients[i].socket;
+                        break;
+                    }
+                }
+                pthread_mutex_unlock(&clientsMutex);
+
+                if (receiverSocket != -1) {
+                    // Forward the message to the receiver's client
+                    char forwardMessage[1100];
+                    sprintf(forwardMessage, "MSG(%d,%d,%s)", idSender, idReceiver, message);
+                    send(receiverSocket, forwardMessage, strlen(forwardMessage), 0);
+                    // Send confirmation to the sender
+                    char confirmationMessage[50];
+                    sprintf(confirmationMessage, "OK(%d, 1)", idSender);
+                    sendMessageToClient(clientSocket, confirmationMessage);
+                } else {
+                    // Receiver not found
+                    printf("User %d not found\n", idReceiver);
+                    char errorMessage[50];
+                    sprintf(errorMessage, "ERROR(%d, 3)", idSender);
+                    sendMessageToClient(clientSocket, errorMessage);
+                }
             }
         } else {
             // Unknown message
