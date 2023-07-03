@@ -8,6 +8,8 @@
 
 #define BUFFER_SIZE 1024
 
+int IdOrigin = -1;
+
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         printf("Usage: %s <server IP> <port>\n", argv[0]);
@@ -71,18 +73,25 @@ int main(int argc, char *argv[]) {
         }
 
         printf("Server message: %s\n", buffer);
+        
 
-        // Check for exit command
-        if (strcmp(buffer, "exit") == 0) {
-            printf("Exiting...\n");
-            break;
+        if(strcmp(buffer, "ERROR(NULL, 1)") == 0){
+            printf("User limit exceeded\n");
+            close(clientSocket);
+            return 0;
+        }else{
+            IdOrigin = atoi(buffer);
+            printf("This client ID is %d\n", IdOrigin);
         }
 
         // Clear the buffer
         memset(buffer, 0, BUFFER_SIZE);
 
-        printf("Enter a message: ");
-        fgets(buffer, BUFFER_SIZE, stdin);
+        printf("Enter a command:\n");
+        fgets(buffer, BUFFER_SIZE, stdin); // User types a command
+
+
+
 
         // Remove newline character
         buffer[strcspn(buffer, "\n")] = '\0';
