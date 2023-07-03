@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
 
-        printf("New client connected\n");
+        // printf("New client connected\n");
 
         // Create a new thread to handle the client
         if (pthread_create(&threads, NULL, handleClient, (void *)&newSocket) != 0) {
@@ -87,6 +87,7 @@ typedef struct {
 } ClientInfo;
 
 int numClients = 0;
+int newClientId = 0;
 ClientInfo clients[MAX_CLIENTS];
 
 
@@ -107,7 +108,8 @@ void *handleClient(void *arg) {
                 send(clientSocket, message, strlen(message), 0);
             } else {
                 // Assign an ID to the client
-                int clientId = numClients++;
+                numClients++;
+                int clientId = newClientId++;
                 clients[clientId].id = clientId;
                 clients[clientId].socket = clientSocket;
 
@@ -123,7 +125,16 @@ void *handleClient(void *arg) {
             // Process REQ_REM message
             int idSender;
             sscanf(buffer, "REQ_REM(%d)", &idSender);
+            printf("%d removed succesfully\n", idSender);
+            send(clientSocket, "OK(01)", strlen("OK(01)"), 0);
 
+            for(int i = 0; i < 15; i++){
+                if (clients[i].id == idSender){
+                    close(clients[i].socket);
+                } 
+            }
+
+            break;
             // Remove the client with idSender from the network
             // ...
         } 
