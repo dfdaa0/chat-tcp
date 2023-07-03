@@ -8,6 +8,8 @@
 
 #define BUFFER_SIZE 1024
 
+int IdOrigin = -1;
+
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         printf("Usage: %s <server IP> <port>\n", argv[0]);
@@ -71,21 +73,59 @@ int main(int argc, char *argv[]) {
         }
 
         printf("Server message: %s\n", buffer);
+        
 
-        // Check for exit command
-        if (strcmp(buffer, "exit") == 0) {
-            printf("Exiting...\n");
-            break;
+        if(strcmp(buffer, "ERROR(NULL, 1)") == 0){
+            printf("User limit exceeded\n");
+            close(clientSocket);
+            return 0;
+        }else{
+            IdOrigin = atoi(buffer);
+            printf("This client ID is %d\n", IdOrigin);
         }
 
         // Clear the buffer
         memset(buffer, 0, BUFFER_SIZE);
 
-        printf("Enter a message: ");
-        fgets(buffer, BUFFER_SIZE, stdin);
+        printf("Enter a command:\n");
+        fgets(buffer, BUFFER_SIZE, stdin); // User types a command
 
         // Remove newline character
         buffer[strcspn(buffer, "\n")] = '\0';
+
+        // Switch case para lidar com os comandos
+        if (strncmp(buffer, "list users", BUFFER_SIZE) == 0) {
+            snprintf(buffer, BUFFER_SIZE, "RES_LIST(%d)", IdOrigin);
+        } 
+        else if (strncmp(buffer, "send to", 7) == 0) {
+            int IdReceiver;
+            char Message[BUFFER_SIZE];
+
+            if (sscanf(buffer, "send to %d \"%[^\"]\"", &IdReceiver, Message) != 2) {
+                printf("Invalid command format.\n");
+                continue; // Retorna ao início do loop
+            }
+
+            snprintf(buffer, BUFFER_SIZE, "MSG(%d, %d, %s)", IdOrigin, IdReceiver, Message);
+        } 
+        else if (strncmp(buffer, "send all", 8) == 0) {
+            char Message[BUFFER_SIZE];
+
+            if (sscanf(buffer, "send all \"%[^\"]\"", Message) != 1) {
+                printf("Invalid command format.\n");
+                continue; // Retorna ao início do loop
+            }
+
+            snprintf(buffer, BUFFER_SIZE, "MSG(%d, NULL, %s)", IdOrigin, Message);
+        } 
+        else if (strncmp(buffer, "close connection", BUFFER_SIZE) == 0) {
+            snprintf(buffer, BUFFER_SIZE, "REQ_REM(%d)", IdOrigin);
+
+        } 
+        else {
+            printf("Invalid command.\n");
+            continue; // Retorna ao início do loop
+        }
 
         // Send message to the server
         if (write(clientSocket, buffer, strlen(buffer)) < 0) {
