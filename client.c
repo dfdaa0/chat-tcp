@@ -106,8 +106,13 @@ int main(int argc, char *argv[]) {
                 continue; // Retorna ao início do loop
             }
 
-            snprintf(buffer, BUFFER_SIZE, "MSG(%d, %d, %s)", IdOrigin, IdReceiver, Message);
+            // Adiciona aspas duplas ao redor de Message
+            char MessageWithQuotes[BUFFER_SIZE];
+            snprintf(MessageWithQuotes, BUFFER_SIZE, "\"%s\"", Message);
+
+            snprintf(buffer, BUFFER_SIZE, "MSG(%d, %d, %s)", IdOrigin, IdReceiver, MessageWithQuotes);
         } 
+        
         else if (strncmp(buffer, "send all", 8) == 0) {
             char Message[BUFFER_SIZE];
 
@@ -116,12 +121,18 @@ int main(int argc, char *argv[]) {
                 continue; // Retorna ao início do loop
             }
 
-            snprintf(buffer, BUFFER_SIZE, "MSG(%d, NULL, %s)", IdOrigin, Message);
+            // Adiciona aspas duplas ao redor de Message
+            char MessageWithQuotes[BUFFER_SIZE];
+            snprintf(MessageWithQuotes, BUFFER_SIZE, "\"%s\"", Message);
+
+            snprintf(buffer, BUFFER_SIZE, "MSG(%d, NULL, %s)", IdOrigin, MessageWithQuotes);
         } 
+
         else if (strncmp(buffer, "close connection", BUFFER_SIZE) == 0) {
             snprintf(buffer, BUFFER_SIZE, "REQ_REM(%d)", IdOrigin);
 
         } 
+
         else {
             printf("Invalid command.\n");
             continue; // Retorna ao início do loop
