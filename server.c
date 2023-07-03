@@ -113,7 +113,7 @@ void *handleClient(void *arg) {
 
                 // Send the assigned ID to the client
                 char idMessage[50];
-                sprintf(idMessage, "You are the number %d\n", clientId);
+                sprintf(idMessage, "%d\n", clientId); // Send the Id number to the client
                 printf("Client %d added\n", clientId);
                 send(clientSocket, idMessage, strlen(idMessage), 0);
             }
