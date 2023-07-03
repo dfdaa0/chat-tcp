@@ -117,7 +117,9 @@ void *handleClient(void *arg) {
                 printf("Client %d added\n", clientId);
                 send(clientSocket, idMessage, strlen(idMessage), 0);
             }
-        } else if (strncmp(buffer, "REQ_REM", 7) == 0) {
+        } 
+        
+        else if (strncmp(buffer, "REQ_REM", 7) == 0) {
             // Process REQ_REM message
             int idSender;
             sscanf(buffer, "REQ_REM(%d)", &idSender);
@@ -126,12 +128,16 @@ void *handleClient(void *arg) {
             // ...
 
 
-        } else if (strncmp(buffer, "RES_LIST", 8) == 0) {
+        } 
+        
+        else if (strncmp(buffer, "RES_LIST", 8) == 0) {
             // Process RES_LIST message
             // ...
 
 
-        } else if (strncmp(buffer, "MSG", 3) == 0) {
+        } 
+        
+        else if (strncmp(buffer, "MSG", 3) == 0) {
             // Process MSG message
             int idSender, idReceiver;
             char message[1024];
@@ -145,7 +151,9 @@ void *handleClient(void *arg) {
 
             // Print error message if receiver not found
             // ...
-        } else {
+        } 
+        
+        else {
             // Unknown message
             // ...
         }
