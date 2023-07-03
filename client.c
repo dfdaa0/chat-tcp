@@ -5,17 +5,89 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #define BUFFER_SIZE 1024
 
-void printErrorMessage(int code) {
-    switch (code) {
-        case 1:
+int IdOrigin = -1;
+int clientSocket;
+char buffer[BUFFER_SIZE];
+
+void *readThread(void *arg) {
+    while (1) {
+        // Receive message from the server
+        memset(buffer, 0, BUFFER_SIZE);
+        if (recv(clientSocket, buffer, BUFFER_SIZE, 0) < 0) {
+            perror("Receive failed");
+            exit(EXIT_FAILURE);
+        }
+
+        printf("Server message: %s\n", buffer);
+
+        if (strcmp(buffer, "ERROR(NULL, 1)") == 0) {
             printf("User limit exceeded\n");
-            break;
-        default:
-            printf("Unknown error\n");
-            break;
+            close(clientSocket);
+            exit(EXIT_SUCCESS);
+        } else if (strncmp(buffer, "ID(", 3) == 0) {
+            int id;
+            if (sscanf(buffer, "ID(%d)", &id) == 1) {
+                IdOrigin = id;
+                printf("This client ID is %d\n", IdOrigin);
+            }
+        }
+    }
+}
+
+void *writeThread(void *arg) {
+    while (1) {
+        printf("Enter a command:\n");
+        fgets(buffer, BUFFER_SIZE, stdin); // User types a command
+
+        // Remove newline character
+        buffer[strcspn(buffer, "\n")] = '\0';
+
+        // Switch case para lidar com os comandos
+        if (strncmp(buffer, "list users", BUFFER_SIZE) == 0) {
+            snprintf(buffer, BUFFER_SIZE, "RES_LIST(%d)", IdOrigin);
+        } else if (strncmp(buffer, "send to", 7) == 0) {
+            int IdReceiver;
+            char Message[BUFFER_SIZE];
+
+            if (sscanf(buffer, "send to %d \"%[^\"]\"", &IdReceiver, Message) != 2) {
+                printf("Invalid command format.\n");
+                continue; // Retorna ao início do loop
+            }
+
+            // Adiciona aspas duplas ao redor de Message
+            char MessageWithQuotes[BUFFER_SIZE];
+            snprintf(MessageWithQuotes, BUFFER_SIZE, "\"%s\"", Message);
+
+            snprintf(buffer, BUFFER_SIZE, "MSG(%d, %d, %s)", IdOrigin, IdReceiver, MessageWithQuotes);
+        } else if (strncmp(buffer, "send all", 8) == 0) {
+            char Message[BUFFER_SIZE];
+
+            if (sscanf(buffer, "send all \"%[^\"]\"", Message) != 1) {
+                printf("Invalid command format.\n");
+                continue; // Retorna ao início do loop
+            }
+
+            // Adiciona aspas duplas ao redor de Message
+            char MessageWithQuotes[BUFFER_SIZE];
+            snprintf(MessageWithQuotes, BUFFER_SIZE, "\"%s\"", Message);
+
+            snprintf(buffer, BUFFER_SIZE, "MSG(%d, NULL, %s)", IdOrigin, MessageWithQuotes);
+        } else if (strncmp(buffer, "close connection", BUFFER_SIZE) == 0) {
+            snprintf(buffer, BUFFER_SIZE, "REQ_REM(%d)", IdOrigin);
+        } else {
+            printf("Invalid command.\n");
+            continue; // Retorna ao início do loop
+        }
+
+        // Send message to the server
+        if (send(clientSocket, buffer, strlen(buffer), 0) < 0) {
+            perror("Send failed");
+            exit(EXIT_FAILURE);
+        }
     }
 }
 
@@ -25,10 +97,8 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    int clientSocket;
     struct sockaddr_storage serverAddr;
     socklen_t addrSize;
-    char buffer[BUFFER_SIZE];
 
     // Create socket
     if (strstr(argv[1], ":") != NULL) {
@@ -67,84 +137,29 @@ int main(int argc, char *argv[]) {
     printf("Connected to the server\n");
 
     // Send the initial request message
-    if (send(clientSocket, "REQ_ADD", 7, 0) < 0) {
+    strcpy(buffer, "REQ_ADD");
+    if (send(clientSocket, buffer, strlen(buffer), 0) < 0) {
         perror("Send failed");
         exit(EXIT_FAILURE);
     }
 
-    // Receive response from the server
-    memset(buffer, 0, BUFFER_SIZE);
-    if (recv(clientSocket, buffer, BUFFER_SIZE, 0) < 0) {
-        perror("Receive failed");
+    pthread_t readThreadId, writeThreadId;
+
+    // Create read thread
+    if (pthread_create(&readThreadId, NULL, readThread, NULL) != 0) {
+        perror("Read thread creation failed");
         exit(EXIT_FAILURE);
     }
 
-    if (strncmp(buffer, "ERROR(1)", 8) == 0) {
-        printf("Connection rejected by the server. Closing the program.\n");
-        close(clientSocket);
+    // Create write thread
+    if (pthread_create(&writeThreadId, NULL, writeThread, NULL) != 0) {
+        perror("Write thread creation failed");
         exit(EXIT_FAILURE);
-    } else {
-        printf("Connection accepted by the server.\n");
-        int IdOrigin = atoi(buffer);
-        printf("IdOrigin: %d\n", IdOrigin);
     }
 
-    // Send and receive messages
-    while (1) {
-        printf("Enter a command: ");
-        fgets(buffer, BUFFER_SIZE, stdin);
-
-        // Remove newline character
-        buffer[strcspn(buffer, "\n")] = '\0';
-
-        // Process user command
-        if (strcmp(buffer, "list users") == 0) {
-            // Send "RES_LIST[IdOrigin]" to the server
-            sprintf(buffer, "RES_LIST%d", IdOrigin);
-        } else if (strncmp(buffer, "send to ", 8) == 0) {
-            // Extract IdReceiver and Message from the command
-            int IdReceiver;
-            char Message[BUFFER_SIZE];
-            sscanf(buffer, "send to %d \"%[^\"]\"", &IdReceiver, Message);
-
-            // Send "MSG([IdOrigin], [IdReceiver], [Message])" to the server
-            sprintf(buffer, "MSG(%d, %d, %s)", IdOrigin, IdReceiver, Message);
-        } else if (strncmp(buffer, "send all", 8) == 0) {
-            // Extract Message from the command
-            char Message[BUFFER_SIZE];
-            sscanf(buffer, "send all \"%[^\"]\"", Message);
-
-            // Send "MSG([IdOrigin], NULL, [Message])" to the server
-            sprintf(buffer, "MSG(%d, NULL, %s)", IdOrigin, Message);
-        } else if (strcmp(buffer, "close connection") == 0) {
-            // Send "REQ_REM([IdOrigin])" to the server
-            sprintf(buffer, "REQ_REM(%d)", IdOrigin);
-        } else {
-            printf("Invalid command\n");
-            continue;
-        }
-
-        // Send command to the server
-        if (send(clientSocket, buffer, strlen(buffer), 0) < 0) {
-            perror("Send failed");
-            exit(EXIT_FAILURE);
-        }
-
-        // Receive response from the server
-        memset(buffer, 0, BUFFER_SIZE);
-        if (recv(clientSocket, buffer, BUFFER_SIZE, 0) < 0) {
-            perror("Receive failed");
-            exit(EXIT_FAILURE);
-        }
-
-        printf("Server message: %s\n", buffer);
-
-        // Check for exit command
-        if (strcmp(buffer, "exit") == 0) {
-            printf("Exiting...\n");
-            break;
-        }
-    }
+    // Wait for threads to finish
+    pthread_join(readThreadId, NULL);
+    pthread_join(writeThreadId, NULL);
 
     // Close the socket
     close(clientSocket);
