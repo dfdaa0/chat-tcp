@@ -34,13 +34,19 @@ void *readThread(void *arg) {
                 IdOrigin = id;
                 printf("This client ID is %d\n", IdOrigin);
             }
+        } else {
+            if(recv(clientSocket, buffer, BUFFER_SIZE, 0) == 0){
+                printf("Connection closed\n");
+                exit(0);
+            }
+                
         }
     }
 }
 
 void *writeThread(void *arg) {
     while (1) {
-        printf("Enter a command:\n");
+        // printf("Enter a command:\n");
         fgets(buffer, BUFFER_SIZE, stdin); // User types a command
 
         // Remove newline character
@@ -76,8 +82,10 @@ void *writeThread(void *arg) {
             snprintf(MessageWithQuotes, BUFFER_SIZE, "\"%s\"", Message);
 
             snprintf(buffer, BUFFER_SIZE, "MSG(%d, NULL, %s)", IdOrigin, MessageWithQuotes);
+
         } else if (strncmp(buffer, "close connection", BUFFER_SIZE) == 0) {
             snprintf(buffer, BUFFER_SIZE, "REQ_REM(%d)", IdOrigin);
+
         } else {
             printf("Invalid command.\n");
             continue; // Retorna ao início do loop
